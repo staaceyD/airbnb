@@ -2,6 +2,10 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 import time
+import requests
+from bs4 import BeautifulSoup
+import csv
+import os
 
 
 def month_to_num(month):
@@ -78,7 +82,7 @@ def choose_check_in_and_out_dates(check_in_date, check_out_date):
             f'div[data-testid="datepicker-day-{check_out_date}"]').click()
 
 
-def choose_guests_ammount(ammount):
+def choose_guests_amount(ammount):
     guests = driver.find_element_by_xpath(
         "//div[contains(text(),'Add guests')]")
     guests.click()
@@ -115,12 +119,13 @@ def choose_type_of_place(place_type):
     type_of_place.click()
 
     time.sleep(2)
-    # entire_place = driver.find_element_by_class_name('_167krry').click()
+
     place = driver.find_element_by_xpath(
         type_to_xpath(place_type))
     place.click()
     save_button = driver.find_element_by_id('filter-panel-save-button')
     save_button.click()
+    time.sleep(5)
 
 
 def set_max_price(price):
@@ -139,3 +144,39 @@ def set_max_price(price):
 
     max_price.send_keys(price)
     driver.find_element_by_id('filter-panel-save-button').click()
+    print(driver.current_url)
+
+
+def сollect_appartments():
+    res = requests.get(driver.current_url)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    links = soup.find_all("a", class_='_gjfol0')
+    prices = soup.select('div._1fwiw8gv span._1p7iugi')
+
+    links_and_prices = []
+
+    for index, item in enumerate(links):
+        href = links[index].get('href')
+        price = prices[index].get_text()
+
+        links_and_prices.append({'link': href, 'price': price})
+
+    fileEmpty = os.stat('results.csv').st_size == 0
+    with open("results.csv", mode="a") as file:
+
+        writer = csv.DictWriter(file, fieldnames=links_and_prices[0].keys())
+        if fileEmpty:
+            writer.writeheader()
+        for data in links_and_prices:
+            writer.writerow(data)
+
+
+def navigate_to_next_page():
+    amount = driver.find_element_by_xpath(
+        '//*[@id="ExploreLayoutController"]/div[1]/div[2]/div/div/div[1]/nav/ul/li[last()-1]/a').text
+
+    arrow_next = driver.find_element_by_xpath(
+        '//*[@id="ExploreLayoutController"]/div[1]/div[2]/div/div/div[1]/nav/ul/li[last()]/a')
+    for _ in range(int(amount)):
+        сollect_appartments()
+        arrow_next.click()
